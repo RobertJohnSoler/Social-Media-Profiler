@@ -2,7 +2,6 @@ from openai import OpenAI
 import os
 
 api_key = os.getenv("OPENAI_API_KEY")
-
 client = OpenAI(
     api_key = api_key,
     organization='org-wmGdyLBBqM7dSJjN05loCRgy',
