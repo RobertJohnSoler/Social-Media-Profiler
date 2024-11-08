@@ -1,6 +1,7 @@
 import http.client
 import json
 import time
+from GPT_api import sendTweetsToGPT
 
 conn = http.client.HTTPSConnection("twitter241.p.rapidapi.com")
 
@@ -47,7 +48,6 @@ def getTweets(username, num_tweets):
     all_tweets = []
     # user_id = '44196397'
     user_id = getUserID(username)
-    print(user_id)
 
     for i in range(total_tweets // count):
         url = f"/user-tweets?user={user_id}&count={count}"
@@ -72,6 +72,12 @@ def getTweets(username, num_tweets):
     
     return all_tweets
 
+print("")
+target = input("Please enter the target's username in Twitter: ")
+print("")
 
-print(getTweets('elonmusk', 20))
+tweets_of_target = getTweets(target, 20)
+output = sendTweetsToGPT(tweets_of_target)
+print(output)
+print("")
 
