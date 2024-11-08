@@ -12,23 +12,37 @@ headers = {
 
 
 def extractPinnedTweet(json_data):
-    tweet_results = json_data['result']['timeline']['instructions'][1]['entry']['content']['itemContent']['tweet_results']['result']
-    pinned_tweet = tweet_results['legacy']['full_text']
-    quoted_tweet = tweet_results['quoted_status_result']['result']['legacy']['full_text']
-    return {"pinned_tweet": pinned_tweet, "about": quoted_tweet}
+    output = {}
+    if json_data['result']['timeline']['instructions'][1]["type"] == "TimelinePinEntry":
+        tweet_results = json_data['result']['timeline']['instructions'][1]['entry']['content']['itemContent']['tweet_results']['result']
+        pinned_tweet = tweet_results['legacy']['full_text']
+        if 'quoted_status_result' in tweet_results.keys():
+            quoted_tweet = tweet_results['quoted_status_result']['result']['legacy']['full_text']
+            output["pinned_tweet"] = pinned_tweet
+            output["about"] = quoted_tweet
+        else:
+            output["pinned_tweet"] = pinned_tweet
+    else:
+        output["pinned_tweet"] = "This user has not pinned any tweet."
+    return output
 
 def extractTweets(json_data):
     tweets = []
     json_data_results = json_data['result']['timeline']['instructions']
     timeline_entries = json_data_results[len(json_data_results)-1]['entries']
     for t in timeline_entries:
-        if 'itemContent' in t['content'].keys() and t['content']['itemContent']['itemType'] == "TimelineTweet":
-            if 'quoted_status_result' in t['content']['itemContent']['tweet_results']['result'].keys():
-                tweets.append({"tweet": t['content']['itemContent']['tweet_results']['result']['legacy']['full_text'], 
-                            "about": t['content']['itemContent']['tweet_results']['result']['quoted_status_result']['result']['legacy']['full_text']})
-            else:
-                tweets.append({"tweet": t['content']['itemContent']['tweet_results']['result']['legacy']['full_text']})
-    return(tweets)
+        try:
+            if 'itemContent' in t['content'].keys() and t['content']['itemContent']['itemType'] == "TimelineTweet":
+                if 'quoted_status_result' in t['content']['itemContent']['tweet_results']['result'].keys():
+                    tweets.append({"tweet": t['content']['itemContent']['tweet_results']['result']['legacy']['full_text'], 
+                                "about": t['content']['itemContent']['tweet_results']['result']['quoted_status_result']['result']['legacy']['full_text']})
+                else:
+                    tweets.append({"tweet": t['content']['itemContent']['tweet_results']['result']['legacy']['full_text']})
+        except KeyError as e:
+            print(f"KeyError: Missing key {e} in tweet data. Skipping this entry.")
+        except Exception as e:
+            print(f"Unexpected error occurred: {e}. Skipping this entry.")
+    return tweets
 
 
 def getUserID(username):
@@ -45,7 +59,9 @@ def getTweets(username, num_tweets):
     count = 20
     total_tweets = num_tweets
     cursor_bottom = None
+    pinned_tweet = {}
     all_tweets = []
+    output = {}
     # user_id = '44196397'
     user_id = getUserID(username)
 
@@ -60,6 +76,11 @@ def getTweets(username, num_tweets):
         res = conn.getresponse()
         data = res.read()
         json_data = json.loads(data.decode("utf-8"))
+        
+        if json_data['result']['timeline']['instructions'][1]["type"] == "TimelinePinEntry":
+            pinned_tweet = extractPinnedTweet(json_data)
+            output["pinned_tweet"] = pinned_tweet
+
         tweets = extractTweets(json_data)
         all_tweets.extend(tweets)
 
@@ -70,13 +91,19 @@ def getTweets(username, num_tweets):
 
         time.sleep(1.001)                                   # API allows only 1 call per 1 second
     
-    return all_tweets
+    output["tweets"] = all_tweets
+    return output
 
 print("")
 target = input("Please enter the target's username in Twitter: ")
 print("")
 
 tweets_of_target = getTweets(target, 20)
+# print(tweets_of_target)
+with open("fetched_results.txt", "w", encoding="utf-8") as file:
+    file.write(str(tweets_of_target))
+    file.close()
+
 output = sendTweetsToGPT(tweets_of_target)
 print(output)
 print("")
